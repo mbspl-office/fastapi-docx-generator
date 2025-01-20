@@ -45,13 +45,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Directory to save and serve files
-generated_dir = Path("generated")
-generated_dir.mkdir(exist_ok=True)
-
-# Directory to store images
-images_dir = Path("images")
-images_dir.mkdir(exist_ok=True)
+base_dir = Path(__file__).parent
+template_path = base_dir / "SBI Format.docx"
+generated_dir = base_dir / "generated"
+images_dir = base_dir / "images"
 
 class Payload(BaseModel):
     data: Dict[str, str]
@@ -59,8 +56,6 @@ class Payload(BaseModel):
 @app.post("/generate-docx/")
 async def generate_docx():
     try:
-        # Save uploaded template
-        template_path = os.path.join(os.path.dirname(__file__), "SBI Format.docx")
 
         # Open the template
         doc = Document(template_path)

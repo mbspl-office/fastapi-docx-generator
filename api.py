@@ -1,8 +1,6 @@
 import os
-import tempfile
 import random
 import string
-from pathlib import Path
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +8,8 @@ from typing import Dict
 from pydantic import BaseModel
 from docx import Document
 from docx.shared import Inches
+from io import BytesIO
+from pathlib import Path
 
 app = FastAPI()
 
@@ -26,28 +26,30 @@ app.add_middleware(
 images_dir = Path("images")
 images_dir.mkdir(exist_ok=True)
 
-class Payload(BaseModel):
-    data: Dict[str, str]
-
-# Function to generate a random 7-character string
+# Helper function to generate a random 7-character string for filenames
 def generate_random_filename(length=7):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+class Payload(BaseModel):
+    data: Dict[str, str]
 
 @app.post("/generate-docx/")
 async def generate_docx():
     try:
-        # Save uploaded template
+        # Load the template DOCX file
         template_path = os.path.join(os.path.dirname(__file__), "SBI Format.docx")
+        
+        if not os.path.exists(template_path):
+            raise FileNotFoundError("Template file 'SBI Format.docx' not found.")
 
         # Open the template
         doc = Document(template_path)
 
-        # Additional functionality: Modify tables and insert images
+        # Modify the tables with specific content (same as original code)
         # Access the first table (index 0)
         table = doc.tables[0]
         table_input_position = [5, 5, 5, 5, 5, 5, 5, 5, 5]
 
-        # Add text to specific cells
         for i in range(len(table.rows)):
             if i <= 8:
                 table.cell(i, table_input_position[i]).text = "  hello"
@@ -100,15 +102,15 @@ async def generate_docx():
         # Generate a random 7-character string for the filename
         random_filename = generate_random_filename() + ".docx"
         
-        # Use a temporary directory for the generated file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
-            generated_filename = temp_file.name
+        # Save the document to a BytesIO object instead of a temporary file
+        doc_buffer = BytesIO()
+        doc.save(doc_buffer)
 
-            # Save the document to the temporary file
-            doc.save(generated_filename)
+        # Move the cursor to the beginning of the BytesIO buffer
+        doc_buffer.seek(0)
 
-        # Return the generated file for download directly
-        return FileResponse(generated_filename, filename=random_filename)
+        # Return the generated file for download directly (without saving it to disk)
+        return FileResponse(doc_buffer, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=random_filename)
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)

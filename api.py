@@ -46,7 +46,6 @@ async def generate_docx():
         doc = Document(template_path)
 
         # Modify the tables with specific content (same as original code)
-        # Access the first table (index 0)
         table = doc.tables[0]
         table_input_position = [5, 5, 5, 5, 5, 5, 5, 5, 5]
 
@@ -76,7 +75,7 @@ async def generate_docx():
                         run.clear()
 
         # Add images to the third table
-        image_index = 0  # Track which image to add
+        image_index = 0
         start_row = 0
         start_col = 0
         image_paths = [
@@ -94,7 +93,10 @@ async def generate_docx():
                 cell = table_3.cell(row_idx, col_idx)
                 paragraph = cell.paragraphs[0]  # Get the first paragraph in the cell
                 run = paragraph.add_run()
-                run.add_picture(image_paths[image_index], width=Inches(4.06))  # Adjust width as needed
+                try:
+                    run.add_picture(image_paths[image_index], width=Inches(4.06))  # Adjust width as needed
+                except Exception as e:
+                    print(f"Error adding image {image_paths[image_index]}: {e}")
                 image_index += 1  # Move to the next image
             if image_index >= len(image_paths):
                 break
@@ -112,5 +114,9 @@ async def generate_docx():
         # Return the generated file for download directly (without saving it to disk)
         return FileResponse(doc_buffer, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=random_filename)
 
+    except FileNotFoundError as e:
+        return JSONResponse({"error": f"File not found: {str(e)}"}, status_code=404)
     except Exception as e:
+        # Log the exception message for debugging purposes
+        print(f"Error occurred: {str(e)}")
         return JSONResponse({"error": str(e)}, status_code=500)

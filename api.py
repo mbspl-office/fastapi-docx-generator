@@ -1,16 +1,14 @@
+import os
+import tempfile
+import random
+import string
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict
 from pydantic import BaseModel
-import os
-from pathlib import Path
 from docx import Document
 from docx.shared import Inches
-from starlette.staticfiles import StaticFiles
-
-import random
-import string
 
 app = FastAPI()
 
@@ -23,23 +21,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Directories to save and serve files
-generated_dir = Path("generated")
-generated_dir.mkdir(exist_ok=True)
-
+# Directory to store images (ensure these directories are created in your project structure)
 images_dir = Path("images")
 images_dir.mkdir(exist_ok=True)
-
-# Serve the images directory as static files
-app.mount("/images", StaticFiles(directory="images"), name="images")
 
 class Payload(BaseModel):
     data: Dict[str, str]
 
-def generate_random_string(length=7):
-    """Generate a random string of fixed length."""
-    letters = string.ascii_letters  # A-Z, a-z
-    return ''.join(random.choice(letters) for i in range(length))
+# Function to generate a random 7-character string
+def generate_random_filename(length=7):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 @app.post("/generate-docx/")
 async def generate_docx():
@@ -105,23 +96,18 @@ async def generate_docx():
             if image_index >= len(image_paths):
                 break
 
-        # Save the generated document
-        random_string = generate_random_string()
-        generated_filename = f"generated_file_{random_string}.docx"
-        generated_path = generated_dir / generated_filename
-        doc.save(generated_path)
+        # Generate a random 7-character string for the filename
+        random_filename = generate_random_filename() + ".docx"
+        
+        # Use a temporary directory for the generated file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as temp_file:
+            generated_filename = temp_file.name
 
-        # Return download link
-        return JSONResponse({"message": "File generated successfully", "download_url": f"/download/{generated_filename}"})
+            # Save the document to the temporary file
+            doc.save(generated_filename)
+
+        # Return the generated file for download directly
+        return FileResponse(generated_filename, filename=random_filename)
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-
-@app.get("/download/{filename}")
-async def download_file(filename: str):
-    file_path = generated_dir / filename
-    if file_path.exists():
-        return FileResponse(file_path, filename=filename)
-    return JSONResponse({"error": "File not found"}, status_code=404)
-
-# Run the app with: uvicorn script_name:app --reload

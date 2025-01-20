@@ -1,13 +1,13 @@
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles  # <-- Ensure this is imported
 from typing import Dict
 from pydantic import BaseModel
 import os
 from pathlib import Path
 from docx import Document
 from docx.shared import Inches
+from starlette.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -20,19 +20,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Directory to save and serve files
+# Directories to save and serve files
 generated_dir = Path("generated")
 generated_dir.mkdir(exist_ok=True)
 
-# Directory to store images
 images_dir = Path("images")
 images_dir.mkdir(exist_ok=True)
 
-# If serving images, mount the "images" directory
-app.mount("/images", StaticFiles(directory="images"), name="images")  # <-- Modify this line as needed
-
-# If you want to serve files from the generated directory, you can add:
-# app.mount("/generated", StaticFiles(directory="generated"), name="generated")
+# Serve the images directory as static files
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
 class Payload(BaseModel):
     data: Dict[str, str]
@@ -89,4 +85,34 @@ async def generate_docx():
         ]
 
         for row_idx in range(start_row, len(table_3.rows)):
-            for col_idx in range(start_col, len(
+            for col_idx in range(start_col, len(table_3.columns)):
+                if image_index >= len(image_paths):
+                    break  # Stop if no more images to add
+                
+                cell = table_3.cell(row_idx, col_idx)
+                paragraph = cell.paragraphs[0]  # Get the first paragraph in the cell
+                run = paragraph.add_run()
+                run.add_picture(image_paths[image_index], width=Inches(4.06))  # Adjust width as needed
+                image_index += 1  # Move to the next image
+            if image_index >= len(image_paths):
+                break
+
+        # Save the generated document
+        generated_filename = f"generated_file.docx"
+        generated_path = generated_dir / generated_filename
+        doc.save(generated_path)
+
+        # Return download link
+        return JSONResponse({"message": "File generated successfully", "download_url": f"/download/{generated_filename}"})
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    file_path = generated_dir / filename
+    if file_path.exists():
+        return FileResponse(file_path, filename=filename)
+    return JSONResponse({"error": "File not found"}, status_code=404)
+
+# Run the app with: uvicorn script_name:app --reload

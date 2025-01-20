@@ -10,6 +10,7 @@ from docx import Document
 from docx.shared import Inches
 from io import BytesIO
 from pathlib import Path
+import traceback
 
 app = FastAPI()
 
@@ -36,12 +37,16 @@ class Payload(BaseModel):
 @app.post("/generate-docx/")
 async def generate_docx():
     try:
+        # Log the beginning of the docx generation
+        print("Starting DOCX generation process...")
+
         # Load the template DOCX file
         template_path = os.path.join(os.path.dirname(__file__), "SBI Format.docx")
+        print(f"Template path: {template_path}")
         
         if not os.path.exists(template_path):
             raise FileNotFoundError("Template file 'SBI Format.docx' not found.")
-
+        
         # Open the template
         doc = Document(template_path)
 
@@ -114,9 +119,8 @@ async def generate_docx():
         # Return the generated file for download directly (without saving it to disk)
         return FileResponse(doc_buffer, media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename=random_filename)
 
-    except FileNotFoundError as e:
-        return JSONResponse({"error": f"File not found: {str(e)}"}, status_code=404)
     except Exception as e:
-        # Log the exception message for debugging purposes
+        # Log the full exception and traceback for better diagnosis
         print(f"Error occurred: {str(e)}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        traceback.print_exc()
+        return JSONResponse({"error": f"Internal Server Error: {str(e)}"}, status_code=500)

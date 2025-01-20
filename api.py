@@ -9,6 +9,9 @@ from docx import Document
 from docx.shared import Inches
 from starlette.staticfiles import StaticFiles
 
+import random
+import string
+
 app = FastAPI()
 
 # Enable CORS for development purposes
@@ -32,6 +35,11 @@ app.mount("/images", StaticFiles(directory="images"), name="images")
 
 class Payload(BaseModel):
     data: Dict[str, str]
+
+def generate_random_string(length=7):
+    """Generate a random string of fixed length."""
+    letters = string.ascii_letters  # A-Z, a-z
+    return ''.join(random.choice(letters) for i in range(length))
 
 @app.post("/generate-docx/")
 async def generate_docx():
@@ -98,7 +106,8 @@ async def generate_docx():
                 break
 
         # Save the generated document
-        generated_filename = f"generated_file.docx"
+        random_string = generate_random_string()
+        generated_filename = f"generated_file_{random_string}.docx"
         generated_path = generated_dir / generated_filename
         doc.save(generated_path)
 

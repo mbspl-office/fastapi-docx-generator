@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles  # <-- Add this import
 from typing import Dict
 from pydantic import BaseModel
 import os
@@ -9,32 +10,6 @@ from docx import Document
 from docx.shared import Inches
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-html = f"""
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>FastAPI on Vercel</title>
-        <link rel="icon" href="/static/favicon.ico" type="image/x-icon" />
-    </head>
-    <body>
-        <div class="bg-gray-200 p-4 rounded-lg shadow-lg">
-            <h1>Hello from FastAPI@{__version__}</h1>
-            <ul>
-                <li><a href="/docs">/docs</a></li>
-                <li><a href="/redoc">/redoc</a></li>
-            </ul>
-            <p>Powered by <a href="https://vercel.com" target="_blank">Vercel</a></p>
-        </div>
-    </body>
-</html>
-"""
-
-@app.get("/")
-async def root():
-    return HTMLResponse(html)
-
 
 # Enable CORS for development purposes
 app.add_middleware(
@@ -45,10 +20,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-base_dir = Path(__file__).parent
-template_path = base_dir / "SBI Format.docx"
-generated_dir = base_dir / "generated"
-images_dir = base_dir / "images"
+# Directory to save and serve files
+generated_dir = Path("generated")
+generated_dir.mkdir(exist_ok=True)
+
+# Directory to store images
+images_dir = Path("images")
+images_dir.mkdir(exist_ok=True)
+
+# Static directory mounting
+app.mount("/static", StaticFiles(directory="static"), name="static")  # <-- Mount static files
 
 class Payload(BaseModel):
     data: Dict[str, str]
@@ -56,6 +37,8 @@ class Payload(BaseModel):
 @app.post("/generate-docx/")
 async def generate_docx():
     try:
+        # Save uploaded template
+        template_path = os.path.join(os.path.dirname(__file__), "SBI Format.docx")
 
         # Open the template
         doc = Document(template_path)
